@@ -14,15 +14,15 @@
 .readout{position:absolute;display:flex;align-items:center;justify-content:center;color:#d8fbff;text-shadow:0 0 8px #00dfff,0 0 15px #00bcd4;font-weight:800;text-align:center;overflow:hidden;padding:0 3%;white-space:nowrap}
 #title{left:11.1%;top:61.9%;width:78.3%;height:8.5%;padding:0 2%}#seek{width:100%;accent-color:#d8fbff;cursor:pointer}
 #driver{left:17.4%;top:74%;width:65%;height:6.3%;font-size:clamp(10px,1.65vw,23px)}
-#skins{position:absolute;inset:0;background:rgba(0,0,0,.88);display:none;z-index:20;padding:5%;overflow:auto}
-#skins.open{display:block}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:900px;margin:auto}
+#skins,#albums{position:absolute;inset:0;background:rgba(0,0,0,.88);display:none;z-index:20;padding:5%;overflow:auto}
+#skins.open,#albums.open{display:block}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:900px;margin:auto}
 .skin{border:1px solid #29e8ff;background:#111;color:#fff;border-radius:8px;padding:6px;cursor:pointer}.skin img{width:100%;display:block}.skin span{display:block;padding:5px;text-align:center;font-size:12px}
 #close{position:fixed;right:18px;top:12px;color:#fff;font-size:32px;z-index:21;background:none;border:0}
 </style></head>
 <body><div id="app"><div id="deck">
 <img id="cover" alt=""><button id="prev" class="hot" aria-label="Anterior"></button><button id="screen" class="hot" aria-label="Reproducir"></button><button id="next" class="hot" aria-label="Siguiente"></button>
 <div id="title" class="readout"><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Posición de la canción"></div><div id="driver" class="readout"></div>
-<div id="skins"><button id="close">×</button><div class="grid" id="grid"></div></div>
+<div id="skins"><button id="close">×</button><div class="grid" id="grid"></div></div><div id="albums"><button id="closeAlbums">×</button><div class="grid" id="albumGrid"></div></div>
 </div></div><audio id="audio" preload="metadata"></audio>
 <script>
 const tracks=[
@@ -39,13 +39,15 @@ function asset(n){return encodeURI(n)}
 function render(){deck.style.backgroundImage="url('"+asset("RD"+skin+".png")+"')";cover.src=asset("CD"+current+".png");driver.textContent=tracks[current][0]+"  by  "+(tracks[current][1]||"ILLICIT SPEED XS");let col=glow[tracks[current][1]]||"#00dfff";driver.style.textShadow="0 0 8px "+col+",0 0 16px "+col;audio.src=asset(audioNames[current]);seek.value=0}
 function step(d){audio.pause();let n=current;do{n=(n+d+tracks.length)%tracks.length}while(!canTrack(n));current=n;render()}
 document.querySelector("#prev").onclick=()=>step(-1);document.querySelector("#next").onclick=()=>step(1);
-let timer=null,longed=false;
+let timer=null,longed=false,clickTimer=null;
 const screen=document.querySelector("#screen");
-function down(e){longed=false;timer=setTimeout(()=>{longed=true;openSkins()},650)}
-function up(){clearTimeout(timer);if(longed)return;setTimeout(()=>{if(!longed){audio.paused?audio.play().catch(()=>{}):0}},220)}
+function down(){longed=false;timer=setTimeout(()=>{longed=true;openAlbums()},650)}
+function up(){clearTimeout(timer);if(longed)return;clickTimer=setTimeout(()=>{if(!longed){audio.paused?audio.play().catch(()=>{}):audio.pause()}},260)}
 screen.addEventListener("pointerdown",down);screen.addEventListener("pointerup",up);screen.addEventListener("pointercancel",()=>clearTimeout(timer));
-screen.addEventListener("dblclick",e=>{e.preventDefault();clearTimeout(timer);audio.pause();audio.currentTime=0});
+screen.addEventListener("dblclick",e=>{e.preventDefault();clearTimeout(clickTimer);clearTimeout(timer);cycleSkin()});
+function cycleSkin(){let n=skin;do{n=(n+1)%skinNames.length}while(!canSkin(n));skin=n;localStorage.setItem("isxsSkin",n);deck.style.backgroundImage="url('"+asset("RD"+n+".png")+"')"}
+function openAlbums(){const g=document.querySelector("#albumGrid");g.innerHTML="";tracks.forEach((t,i)=>{if(!canTrack(i))return;let b=document.createElement("button");b.className="skin";b.innerHTML='<img src="'+asset("CD"+i+'.png')+'" alt=""><span>'+t[0]+'<br><small>by '+(t[1]||"ILLICIT SPEED XS")+"</small></span>";b.onclick=()=>{audio.pause();current=i;render();document.querySelector("#albums").classList.remove("open")};g.appendChild(b)});document.querySelector("#albums").classList.add("open")}
 function openSkins(){const g=document.querySelector("#grid");g.innerHTML="";skinNames.forEach((n,i)=>{if(!canSkin(i))return;let b=document.createElement("button");b.className="skin";b.innerHTML='<img src="'+asset("RD"+i+'.png')+'" alt=""><span>'+n+"</span>";b.onclick=()=>{skin=i;localStorage.setItem("isxsSkin",i);deck.style.backgroundImage="url('"+asset("RD"+i+".png")+"')";document.querySelector("#skins").classList.remove("open")};g.appendChild(b)});document.querySelector("#skins").classList.add("open")}
-document.querySelector("#close").onclick=()=>document.querySelector("#skins").classList.remove("open");
+document.querySelector("#close").onclick=()=>document.querySelector("#skins").classList.remove("open");document.querySelector("#closeAlbums").onclick=()=>document.querySelector("#albums").classList.remove("open");let deckHold=null;deck.addEventListener("pointerdown",e=>{if(e.target===screen||e.target.closest("#skins")||e.target.closest("#albums")||e.target===document.querySelector("#prev")||e.target===document.querySelector("#next")||e.target===seek)return;deckHold=setTimeout(()=>openSkins(),650)});deck.addEventListener("pointerup",()=>clearTimeout(deckHold));deck.addEventListener("pointercancel",()=>clearTimeout(deckHold));
 audio.addEventListener("timeupdate",()=>{if(audio.duration)seek.value=Math.round(audio.currentTime/audio.duration*1000)});seek.addEventListener("input",()=>{if(audio.duration)audio.currentTime=(seek.value/1000)*audio.duration});audio.addEventListener("ended",()=>step(1));render();
 </script></body></html>
